@@ -22,6 +22,15 @@ A world of finds. One destination. Ebooks, audiobooks and courses, plus an admin
 
 Email confirmation: Supabase's built-in email sender is limited to a few emails per hour. For launch, set up a custom SMTP sender (Authentication > Emails), or turn off "Confirm email" while testing.
 
+## Payments (set up in the admin)
+1. Run the new **PAYMENTS** section of `schema.sql` (or the whole file again; it is safe to re-run).
+2. Admin > Payments: set the checkout button label, and add manual methods (bank transfer, mobile money, PayPal address). Their instructions are shown to customers on the checkout page.
+3. Admin > Products > Edit: paste a payment link (Stripe, Paystack, Flutterwave, PayPal) in **Checkout link**, and the private download or course link in **Access link**. The access link is stored in a separate protected table and is only given to a customer whose order is marked paid.
+4. A customer taps Buy now, signs in, chooses how to pay, and an order is created. Manual payments arrive as "awaiting confirmation" with the customer's reference; online payments arrive as "pending".
+5. Admin > Orders: check the payment in your bank or Stripe/Paystack, then **Mark paid**. The item then shows an Open button in the customer's **My library**.
+Orders also record the affiliate referral code (`ref_code`). The affiliate dashboard does not read orders yet.
+Prices are shown in dollars.
+
 ## How the pages are linked
 - **Admin > store**: products, departments, banners and the store color are saved to the `site_data` table. The store reads them (first visit reloads once to apply changes).
 - **Affiliate signups**: create a `pending` profile. The admin approves or rejects it in Accounts. Only approved affiliates can enter the dashboard.
@@ -31,7 +40,7 @@ Email confirmation: Supabase's built-in email sender is limited to a few emails 
 - **Security**: all rules are in `schema.sql` (Row Level Security). Nobody can sign up as admin. Never put the secret / service_role key in this repository.
 
 ## Not built yet (next jobs)
-- **Payments and checkout**, order records, and secure expiring download links for purchased files. The cart is not connected.
+- **Automatic payment confirmation.** Payments are confirmed by the admin by hand (Orders > Mark paid). To confirm automatically, add Stripe or Paystack webhooks (a Supabase Edge Function) that set the order to paid.
 - **Affiliate tracking**: the store saves `?ref=CODE` to `localStorage.tv_ref`. Record referrals and orders on the server, calculate commission, reverse it on refunds, and feed the affiliate dashboard (it shows zeros until then).
 - **Reader, audio player and a "My Library" page** with saved progress.
 - Translations of product text in French and Spanish.
