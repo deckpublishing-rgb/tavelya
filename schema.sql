@@ -87,6 +87,40 @@ grant select, insert, update, delete on public.messages to authenticated;
 grant execute on function public.is_admin(), public.is_affiliate() to anon, authenticated;
 grant execute on function public.save_profile(text,text,text) to authenticated;
 
+-- ===== PAYMENTS (orders, access links, downloads). Safe to run again. =====
+create table if not exists public.orders(
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users on delete set null,
+  product_key text not null, product_title text,
+  amount numeric, method text, reference text, ref_code text,
+  status text not null default 'pending' check (status in ('pending','awaiting_confirmation','paid','cancelled','refunded')),
+  created_at timestamptz default now());
+create table if not exists public.product_access(product_key text primary key, url text not null);
+
+alter table public.orders enable row level security;
+alter table public.product_access enable row level security;
+
+drop policy if exists orders_insert on public.orders;
+create policy orders_insert on public.orders for insert to authenticated with check (user_id=auth.uid() and status in ('pending','awaiting_confirmation'));
+drop policy if exists orders_read on public.orders;
+create policy orders_read on public.orders for select to authenticated using (user_id=auth.uid() or public.is_admin());
+drop policy if exists orders_admin_update on public.orders;
+create policy orders_admin_update on public.orders for update to authenticated using (public.is_admin()) with check (public.is_admin());
+drop policy if exists orders_admin_delete on public.orders;
+create policy orders_admin_delete on public.orders for delete to authenticated using (public.is_admin());
+drop policy if exists access_admin on public.product_access;
+create policy access_admin on public.product_access for all to authenticated using (public.is_admin()) with check (public.is_admin());
+
+grant select, insert, update, delete on public.orders to authenticated;
+grant select, insert, update, delete on public.product_access to authenticated;
+
+-- Buyers get an access link only for products they have a PAID order for.
+create or replace function public.my_downloads() returns table(product_key text, url text)
+language sql security definer stable set search_path=public as
+$$ select a.product_key, a.url from public.product_access a
+   where exists(select 1 from public.orders o where o.user_id=auth.uid() and o.status='paid' and o.product_key=a.product_key) $$;
+grant execute on function public.my_downloads() to authenticated;
+
 -- STEP 2 (after you create your own account on the site): make yourself the admin.
 -- Replace the text in quotes with the email you signed up with, then run this line alone.
 -- update public.profiles set type='admin', status='approved' where email='YOUR_EMAIL_HERE';
